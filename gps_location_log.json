@@ -1,0 +1,42 @@
+[
+  {
+    "gps_id": "GPS_20251202_013911_3816",
+    "timestamp": "2025-12-02T01:39:11.381657",
+    "session_id": "SESSION_1764619750753",
+    "gps_latitude": 12.9630208,
+    "gps_longitude": 77.7322496,
+    "gps_accuracy": 3250.776397174498,
+    "permission_status": "granted",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+  },
+  {
+    "gps_id": "GPS_20251202_014000_1968",
+    "timestamp": "2025-12-02T01:40:00.196826",
+    "session_id": "SESSION_1764619750753",
+    "gps_latitude": 12.9364577,
+    "gps_longitude": 77.7666769,
+    "gps_accuracy": 20,
+    "permission_status": "granted",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+  },
+  {
+    "gps_id": "GPS_20251202_014031_2735",
+    "timestamp": "2025-12-02T01:40:31.273546",
+    "session_id": "SESSION_1764619750753",
+    "gps_latitude": 12.9364577,
+    "gps_longitude": 77.7666769,
+    "gps_accuracy": 20,
+    "permission_status": "granted",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+  },
+  {
+    "gps_id": "GPS_20251202_014049_7212",
+    "timestamp": "2025-12-02T01:40:49.721285",
+    "session_id": "SESSION_1764619847246",
+    "gps_latitude": 12.9364577,
+    "gps_longitude": 77.7666769,
+    "gps_accuracy": 20,
+    "permission_status": "granted",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+  }
+]
