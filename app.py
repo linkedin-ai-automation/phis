@@ -8,6 +8,8 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 from datetime import datetime
 import json
 import os
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -674,6 +676,17 @@ def view_stats():
     return html
 
 
+def keep_alive():
+    """Ping the server every 14 minutes to prevent sleep"""
+    while True:
+        try:
+            time.sleep(14 * 60)  # Sleep for 14 minutes
+            # Replace with your actual Render URL
+            requests.get('https://marriege.onrender.com/stats', timeout=10)
+            print(f"[KEEP-ALIVE] Pinged server at {datetime.now()}")
+        except Exception as e:
+            print(f"[KEEP-ALIVE] Ping failed: {e}")
+
 @app.route('/clear-logs')
 def clear_logs():
     """Clear all log files"""
@@ -942,5 +955,7 @@ if __name__ == '__main__':
     print("   • Reset Logs:    http://localhost:5000/reset")
     print("\n🚀 Starting server...\n")
     print("="*70 + "\n")
+    keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
+    keep_alive_thread.start()
     
     app.run(debug=True, host='0.0.0.0', port=5000)
